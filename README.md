@@ -22,6 +22,8 @@ Request body:
 
 Response:
 
+If duplicate exists
+
 ```json
 {
   "contact": {
