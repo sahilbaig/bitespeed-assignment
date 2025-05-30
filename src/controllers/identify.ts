@@ -8,13 +8,13 @@ export const identifyController = async (
   const { email, phoneNumber } = req.body;
 
   if (!email && !phoneNumber) {
-    res.status(400).json({ error: "email or phoneNumber required" });
+    res.status(400).json({ error: "email or phone number required" });
     return;
   }
 
   try {
     // Step 1: Find existing contacts
-    const { data: foundContacts, error: fetchError } = await supabase
+    const { data: foundContacts } = await supabase
       .from("contacts")
       .select("*")
       .or(
@@ -26,18 +26,14 @@ export const identifyController = async (
           .join(",")
       );
 
-    if (fetchError) throw fetchError;
-
     if (!foundContacts || foundContacts.length === 0) {
-      const { data: newContact, error: insertError } = await supabase
+      const { data: newContact } = await supabase
         .from("contacts")
         .insert([
           { email, phone_number: phoneNumber, link_precedence: "primary" },
         ])
         .select()
         .single();
-
-      if (insertError) throw insertError;
 
       res.json({
         contact: {
@@ -61,23 +57,23 @@ export const identifyController = async (
     );
 
     // Step 3: Get all related contacts
-    const { data: linkedContacts, error: linkedError } = await supabase
+    const { data: linkedContacts } = await supabase
       .from("contacts")
       .select("*")
       .or(`id.eq.${primary.id},linked_id.eq.${primary.id}`);
-
-    if (linkedError) throw linkedError;
 
     const emailsSet = new Set<string>();
     const phonesSet = new Set<string>();
     const secondaryIds: string[] = [];
 
-    linkedContacts.forEach((contact) => {
-      if (contact.email) emailsSet.add(contact.email);
-      if (contact.phone_number) phonesSet.add(contact.phone_number);
-      if (contact.link_precedence === "secondary")
-        secondaryIds.push(contact.id);
-    });
+    if (linkedContacts) {
+      linkedContacts.forEach((contact) => {
+        if (contact.email) emailsSet.add(contact.email);
+        if (contact.phone_number) phonesSet.add(contact.phone_number);
+        if (contact.link_precedence === "secondary")
+          secondaryIds.push(contact.id);
+      });
+    }
 
     const emailExists = email ? emailsSet.has(email) : false;
     const phoneExists = phoneNumber ? phonesSet.has(phoneNumber) : false;
@@ -95,8 +91,6 @@ export const identifyController = async (
         ])
         .select()
         .single();
-
-      if (secError) throw secError;
 
       if (newSecondary.email) emailsSet.add(newSecondary.email);
       if (newSecondary.phone_number) phonesSet.add(newSecondary.phone_number);
